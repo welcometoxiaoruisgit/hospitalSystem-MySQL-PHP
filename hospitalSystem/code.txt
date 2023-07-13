@@ -1,0 +1,430 @@
+use hospitals;
+-- the 'id's in every table are all primary key, they may not affect the other attributes, just easy for retrieving.
+create table hospital(
+                          id int primary key comment 'id of the hospital',
+                          name varchar(20) not null unique comment 'The name of the hospital',
+                          nurseNum int not null check(nurseNum>=0 and nurseNum<=5) comment 'how many nurses in this hospital',
+                          doctorNum int not null check(doctorNum>=0 and doctorNum<=3) comment 'how many doctors',
+                          patientNum int not null check(patientNum>=0 and patientNum<=10) comment 'how many patients',
+                          key hosp_union_Info (id,name,nurseNum,doctorNum,patientNum)
+) comment 'Hospital information';
+
+create table hospLocations (
+                          id int primary key,
+                          location varchar(20) not null unique,
+                          constraint hosp_location foreign key (id) references hospital(id) on update cascade on delete cascade
+);
+
+create table pharmacy(
+                           id int primary key comment 'primary key and the id of the pharmacy',
+                           name varchar(20) not null unique comment 'The name of the pharmacy',
+                           key pharmacy_id_name (id,name)
+) comment 'Pharmacy Information';
+
+create table pharLocations (
+                           id int primary key,
+                           location varchar(20) not null unique,
+                           constraint phar_location foreign key (id) references pharmacy(id) on update cascade on delete cascade
+);
+
+create table drugOrder(
+                          id int primary key auto_increment comment 'primary key',
+                          hospName varchar(20) not null comment 'which hospital pays the bill?',
+                          pharName varchar(20) not null comment 'which pharmacy sends the drug?',
+                          drugName varchar(20) not null comment 'the name of the drug',
+                          billAmount double not null check ( billAmount >= 0 ) comment 'how much is the drug?',
+                          key drugOrder_union_Info(id,hospName,pharName,drugName,billAmount),
+                          constraint drugOrder_fk_hospName foreign key (hospName) references hospital(name)
+                              on update cascade on delete cascade,
+                          constraint drugOrder_fk_pharName foreign key (pharName) references pharmacy(name)
+                              on update cascade on delete cascade
+) comment 'The information of the drug order';
+
+create table patient(
+                        id int primary key auto_increment comment 'primary key',
+                        patID int not null unique comment 'The id of the patient',
+                        patName varchar(15) not null comment 'The name of the patient',
+                        patGender varchar(10) comment 'The gender of the patient',
+                        patAge int not null comment 'The age of the patient',
+                        patPhoneNum varchar(15) unique comment 'The phone number of the patient',
+                        disease varchar(30) not null comment 'The disease of the patient',
+                        treatment varchar(30) not null comment 'The treatment which is going on',
+                        days int not null check(days>=0) comment 'the number of days the patient are admitted',
+                        primaryDocID int not null comment 'The id of the primary doctor of the patient',
+                        patLocation varchar(20) not null comment 'The patient live in which location',
+                        admitLocation varchar(20) not null comment 'The location where the patient is admitted',
+                        key union_patientInfo (id,patID,patName,patGender,patAge,patPhoneNum,disease,treatment,days,
+                                               primaryDocID,patLocation,admitLocation)
+) comment 'The information of the patient';
+
+create table doctor(
+                       id int primary key auto_increment comment 'primary key',
+                       docID int not null unique comment 'the id of the doctor',
+                       docName varchar(20) not null comment 'the name of the doctor',
+                       docAge int not null check(docAge>0) comment 'the age of the doctor',
+                       hospName varchar(20) not null comment 'the doctor is in which hospital',
+                       key doc_ID_Age_Loca_respPatID (id,docID,docName,docAge,hospName),
+                       constraint docLoca_fk_hosp foreign key (hospName) references hospital(name)
+                           on update cascade on delete cascade
+) comment 'the information of the doctor';
+
+create table treatment(
+                          id int primary key auto_increment,
+                          patientID int not null,
+                          doctorID int not null,
+                          disease varchar(20) not null,
+                          key connPD_patID_docID (id,patientID,doctorID,disease),
+                          constraint patientID_fk foreign key (patientID) references patient(patID)
+                              on update cascade on delete cascade,
+                          constraint doctorID_fk foreign key (doctorID) references doctor(docID)
+                              on update cascade on delete cascade
+) comment 'Connection of the table patient and doctor';
+
+create table nurse(
+                      id int primary key auto_increment,
+                      nurID int not null unique comment 'the id of the nurse',
+                      nurName varchar(20) not null comment 'the name of the nurse',
+                      nurAge int not null check(nurAge>0) comment 'the age of the nurse',
+                      hospName varchar(20) not null comment 'the nurse is in which location',
+                      key nur_ID_Age_dept_Loca (id,nurID,nurName,nurAge,hospName),
+                      constraint nurLoca_fk_hosp foreign key (hospName) references hospital(name)
+                          on update cascade on delete cascade
+) comment 'the information of the nurse';
+
+create table nurTakeCarePat(
+                               id int primary key auto_increment,
+                               nurID int not null,
+                               patID int not null unique,
+                               key takeCare_nurID_patID (id,nurID,patID),
+                               constraint nurTakeCarePat_nurID foreign key (nurID) references nurse (nurID)
+                                   on update cascade on delete cascade,
+                               constraint nurTakeCarePat_patID foreign key (patID) references patient (patID)
+                                   on update cascade on delete cascade
+) comment 'the info of nurse taking care of patients';
+
+create table admission(
+                          id int primary key auto_increment,
+                          attendDocID int not null,
+                          nurID int not null,
+                          patID int not null,
+                          dest varchar(20) not null,
+                          key relocate_union (id,attendDocID,nurID,patID,dest),
+    -- if a patient has many diseases, the primary docID has already stored in the patient table,
+    --  the attending doc treats other diseases of this patient.
+                          constraint admission_docID foreign key (attendDocID) references doctor(docID)
+                              on update cascade on delete cascade,
+                          constraint admission_nurID foreign key (nurID) references nurse(nurID)
+                              on update cascade on delete cascade,
+                          constraint admission_patID foreign key (patID) references patient(patID)
+                              on update cascade on delete cascade,
+                          constraint admission_dest foreign key (dest) references hospital(name)
+                              on update cascade on delete cascade
+) comment 'the admission of the patient';
+
+-- Hospital and Doctor relationship table
+create table hospDoc (
+                                 hospID int not null,
+                                 docID int not null,
+                                 primary key (hospID, docID),
+                                 constraint hospDoc_hospID_fk foreign key (hospID) references hospital(id) on update cascade on delete cascade,
+                                 constraint hospDoc_docID_fk foreign key (docID) references doctor(docID) on update cascade on delete cascade
+);
+
+-- Hospital and Nurse relationship table
+create table hospNur (
+                                hospID int,
+                                nurID int,
+                                primary key (hospID, nurID),
+                                constraint hospNur_hospID_fk foreign key (hospID) references hospital(id) on update cascade on delete cascade,
+                                constraint hospNur_nurID_fk foreign key (nurID) references nurse(nurID) on update cascade on delete cascade
+);
+
+-- Hospital and Pharmacy relationship table
+create table hospPhar (
+                                   hospID int not null,
+                                   pharID int not null,
+                                   primary key (hospID, pharID),
+                                   constraint hospPhar_hospID_fk foreign key (hospID) references hospital(id) on update cascade on delete cascade,
+                                   constraint hospPhar_pharID_fk foreign key (pharID) references pharmacy(id) on update cascade on delete cascade
+);
+
+-- insertion
+insert into hospital values (1,'Loyal Hospital',5,3,0),(2,'Center Hospital',5,3,0),
+                            (3,'My Hospital',5,3,0);
+
+insert into hospLocations values (1,'Loyal Road'),(2,'Center Road'),(3,'My Hospital');
+
+insert into pharmacy values (1,'Rain Pharmacy'),(2,'Sun Pharmacy'),(3,'Fog Pharmacy');
+
+insert into pharLocations values (1,'Rain Road'),(2,'Sun Road'),(3,'Fog Road');
+
+INSERT INTO `drugorder` VALUES (1,'Loyal Hospital','Rain Pharmacy','heart disease Drug',1000),(2,'Loyal Hospital','Rain Pharmacy','lung disease Drug',900),
+                               (3,'Loyal Hospital','Rain Pharmacy','fever Drug',200),(4,'Center Hospital','Sun Pharmacy','stomachache Drug',250),
+                               (5,'Center Hospital','Sun Pharmacy','skin disease Drug',800),(6,'Center Hospital','Sun Pharmacy','gastroenteritis Drug',850),
+                               (7,'My Hospital','Fog Pharmacy','bronchitis Drug',980),(8,'My Hospital','Fog Pharmacy','allergy Drug',400),
+                               (9,'My Hospital','Fog Pharmacy','epilepsia Drug',750);
+
+-- set global local_infile = 1;
+-- load data local infile '/patient.txt' into table patient character set utf8 fields terminated by ',' lines terminated by '\n';
+INSERT INTO `patient` VALUES (1,1001,'Tom','male',20,'1100001','heart disease','heart treatment',30,91001,'Bridge Ave','Loyal Hospital'),
+                             (2,1002,'Kalan','female',21,'1100002','heart disease','heart disease treatment',60,91001,'Josephine Ave','Loyal Hospital'),
+                             (3,1003,'Vance','male',22,'1100003','heart disease','heart treatment',60,91001,'Rankin Ave','Loyal Hospital'),
+                             (4,1004,'Caesare','female',23,'1100004','lung disease','lung treatment',5,91002,'Union St','Loyal Hospital'),
+                             (5,1005,'Adler','male',44,'1100005','lung disease','lung treatment',14,91002,'Randolph Ave','Loyal Hospital'),
+                             (6,1006,'Idan','female',45,'1100006','lung disease','lung treatment',33,91002,'McEwan Ave','Loyal Hospital'),
+                             (7,1007,'Potter','male',66,'1100007','fever','fever treatment',5,91003,'Mckay Ave','Loyal Hospital'),
+                             (8,1008,'Mason','female',77,'1100008','fever','fever treatment',6,91003,'Curry Ave','Loyal Hospital'),
+                             (9,1009,'Rabbie','male',28,'1100009','fever','fever treatment',8,91003,'Askin Ave','Loyal Hospital'),
+                             (10,1010,'Trond','female',12,'1100010','stomachache','stomachache treatment',30,91004,'Bridge Ave','Center Hospital'),
+                             (11,1011,'Fern','male',11,'1100011','stomachache','stomachache treatment',50,91004,'Union St','Center Hospital'),
+                             (12,1012,'Alice','female',31,'1100012','stomachache','stomachache treatment',60,91004,'Askin Ave','Center Hospital'),
+                             (13,1013,'Bunny','male',32,'1100013','skin disease','skin treatment',60,91005,'Loyal Road','Center Hospital'),
+                             (14,1014,'Belle','female',33,'1100014','skin disease','skin treatment',70,91005,'Bridge Ave','Center Hospital'),
+                             (15,1015,'Estelle','female',14,'1100015','skin disease','skin treatment',50,91005,'Randolph Ave','Center Hospital'),
+                             (16,1016,'Jasmine','female',15,'1100016','gastroenteritis','gastroenteritis treatment',21,91006,'Mckay Ave','Center Hospital'),
+                             (17,1017,'Iris','female',35,'1100017','gastroenteritis','gastroenteritis treatment',28,91006,'Curry Ave','Center Hospital'),
+                             (18,1018,'Emily','female',36,'1100018','gastroenteritis','gastroenteritis treatment',32,91006,'Rankin Ave','Center Hospital'),
+                             (19,1019,'Candice','female',37,'1100019','bronchitis','bronchitis treatment',5,91007,'Union St','My Hospital'),
+                             (20,1020,'Arthur','male',38,'1100020','bronchitis','bronchitis treatment',7,91007,'Bridge Ave','My Hospital'),
+                             (21,1021,'Austin','male',39,'1100021','bronchitis','bronchitis treatment',9,91007,'Peter St','My Hospital'),
+                             (22,1022,'Brian','male',40,'1100022','allergy','allergy treatment',7,91008,'Mill St','My Hospital'),
+                             (23,1023,'Daniel','male',41,'1100023','allergy','allergy treatment',10,91008,'Sunset Ave','My Hospital'),
+                             (24,1024,'Douglas','male',42,'1100024','allergy','allergy treatment',10,91008,'Sunset Ave','My Hospital'),
+                             (25,1025,'Jason','male',43,'1100025','epilepsia','epilepsia treatment',480,91009,'Baby St','My Hospital'),
+                             (26,1026,'Justin','male',16,'1100026','epilepsia','epilepsia treatment',180,91009,'Mill St','My Hospital'),
+                             (27,1027,'Ryan','male',17,'1100027','epilepsia','epilepsia treatment',200,91009,'Peter St','My Hospital');
+
+INSERT INTO `doctor` VALUES (1,91001,'Krisu',50,'Loyal Hospital'),(2,91002,'Tony',52,'Loyal Hospital'),
+                            (3,91003,'Carver',53,'Loyal Hospital'),(4,91004,'Brett',54,'Center Hospital'),
+                            (5,91005,'Hymen',55,'Center Hospital'),(6,91006,'Kamran',56,'Center Hospital'),
+                            (7,91007,'Foster',57,'My Hospital'),(8,91008,'Matteus',58,'My Hospital'),(9,91009,'Gaylen',59,'My Hospital');
+
+INSERT INTO `treatment` VALUES
+                            (1,1001,91001,'heart disease'),(2,1004,91002,'lung disease'),(3,1007,91003,'fever'),(4,1010,91004,'stomachache'),
+                            (5,1013,91005,'skin disease'),(6,1016,91006,'gastroenteritis'),(7,1019,91007,'bronchitis'),(8,1022,91008,'allergy'),
+                            (9,1025,91009,'epilepsia'),(11,1002,91001,'heart disease'),(12,1005,91002,'lung disease'),
+                            (13,1008,91003,'fever'),(14,1011,91004,'stomachache'),(15,1014,91005,'skin disease'),(16,1017,91006,'gastroenteritis'),
+                            (17,1020,91007,'bronchitis'),(18,1023,91008,'allergy'),(19,1026,91009,'epilepsia'),
+                            (21,1003,91001,'heart disease'),(22,1006,91002,'lung disease'),(23,1009,91003,'fever'),(24,1012,91004,'stomachache'),
+                            (25,1015,91005,'skin disease'),(26,1018,91006,'gastroenteritis'),(27,1021,91007,'bronchitis'),(28,1024,91008,'allergy'),
+                            (29,1027,91009,'epilepsia');
+
+INSERT INTO `nurse` VALUES (1,21001,'Jose',18,'Loyal Hospital'),(2,21002,'Ross',19,'Loyal Hospital'),(3,21003,'Julie',20,'Loyal Hospital'),
+                           (4,21004,'Groy',21,'Loyal Hospital'),(5,21005,'Carol',22,'Loyal Hospital'),(6,21006,'Joan',22,'Center Hospital'),
+                           (7,21007,'Betty',21,'Center Hospital'),(8,21008,'Linda',20,'Center Hospital'),(9,21009,'Lily',19,'Center Hospital'),
+                           (10,21010,'Ann',18,'Center Hospital'),(11,21011,'Judy',18,'My Hospital'),(12,21012,'Rudy',19,'My Hospital'),
+                           (13,21013,'Helen',20,'My Hospital'),(14,21014,'Lisa',21,'My Hospital'),(15,21015,'Mary',22,'My Hospital');
+
+INSERT INTO `nurtakecarepat` VALUES (1,21001,1001),(2,21001,1002),(3,21002,1003),(4,21002,1004),(5,21003,1005),(6,21003,1006),
+                                    (7,21004,1007),(8,21004,1008),(9,21005,1009),(10,21005,1010),(11,21006,1011),(12,21006,1012),
+                                    (13,21007,1013),(14,21007,1014),(15,21008,1015),(16,21008,1016),(17,21009,1017),(18,21009,1018),
+                                    (19,21010,1019),(20,21010,1020),(21,21011,1021),(22,21011,1022),(23,21012,1023),(24,21012,1024),
+                                    (25,21013,1025),(26,21013,1026),(27,21014,1027);
+
+INSERT INTO `admission` VALUES (1,91001,21001,1027,'Loyal Hospital'),(2,91001,21001,1026,'Loyal Hospital'),(3,91001,21002,1025,'Loyal Hospital'),
+                               (4,91002,21002,1024,'Loyal Hospital'),(5,91002,21003,1023,'Loyal Hospital'),(6,91002,21003,1022,'Loyal Hospital'),
+                               (7,91003,21004,1021,'Loyal Hospital'),(8,91003,21004,1020,'Loyal Hospital'),(9,91003,21005,1019,'Loyal Hospital'),
+                               (10,91003,21005,1018,'Loyal Hospital'),(11,91004,21006,1017,'Center Hospital'),(12,91004,21006,1016,'Center Hospital'),
+                               (13,91004,21007,1015,'Center Hospital'),(14,91005,21007,1014,'Center Hospital'),(15,91005,21008,1013,'Center Hospital'),
+                               (16,91005,21008,1012,'Center Hospital'),(17,91005,21009,1011,'Center Hospital'),(18,91006,21009,1010,'Center Hospital'),
+                               (19,91006,21010,1009,'Center Hospital'),(20,91006,21010,1008,'Center Hospital'),(21,91007,21011,1007,'My Hospital'),
+                               (22,91007,21011,1006,'My Hospital'),(23,91007,21012,1005,'My Hospital'),(24,91007,21012,1004,'My Hospital'),
+                               (25,91008,21013,1003,'My Hospital'),(26,91008,21013,1002,'My Hospital'),(27,91008,21014,1001,'My Hospital');
+
+
+insert into hospDoc values (1,91001),(1,91002),(1,91003),
+                           (2,91004),(2,91005),(2,91006),
+                           (3,91007),(3,91008),(3,91009);
+
+insert into hospNur values (1,21001),(1,21002),(1,21003),(1,21004),(1,21005),
+                           (2,21006),(2,21007),(2,21008),(2,21009),(2,21010),
+                           (3,21011),(3,21012),(3,21013),(3,21014),(3,21015);
+
+insert into hospPhar values (1,1),(1,2),(1,3),
+                            (2,1),(2,2),(2,3),
+                            (3,1),(3,2),(3,3);
+
+-- --------triggers---------
+-- patient starts his treatment, patientNum of hospital +1
+delimiter //
+create trigger increasePatientNum_after_insertPatient
+    after INSERT on patient for each row
+begin
+    update hospital set patientNum = patientNum + 1 where name = new.admitLocation;
+end;
+// delimiter ;
+
+-- patient finishes his treatment, patientNum of hospital -1
+delimiter //
+create trigger decreasePatientNum_after_deletePatient
+    after DELETE on patient for each row
+begin
+    update hospital set patientNum = patientNum - 1 where name = old.admitLocation;
+end;
+// delimiter ;
+
+-- patient is relocated to another hospital, check if patientNum of that hospital <10, if ==10 then post an error message
+delimiter //
+create trigger checkPatientNumOfHospital_after_relocatePatient
+    after update on patient for each row
+begin
+    declare newHospitalPatientNum int;
+    if old.admitLocation <> new.admitLocation then
+        update hospital set patientNum = patientNum - 1 where name = old.admitLocation;
+
+        select patientNum into newHospitalPatientNum from hospital where name = new.admitLocation;
+
+        if newHospitalPatientNum < 10 then
+            update hospital set patientNum = patientNum + 1 where name = new.admitLocation;
+        else
+            signal sqlstate '45000'
+                set message_text = 'Cannot transfer patient: The destination hospital has reached the maximum number of patients';
+        end if;
+    end if;
+end;
+// delimiter ;
+
+-- a nurse can take care of at most 2 patient
+delimiter //
+create trigger checkPatientNumOfNurse_before_insertNurTakeCarePat
+    before insert on nurTakeCarePat for each row
+begin
+    declare nursePatientCount int;
+    select count(*) into nursePatientCount from nurTakeCarePat where nurID = new.nurID;
+
+    if nursePatientCount >= 2 then
+        signal sqlstate '45000'
+            set message_text = 'Cannot assign patient: The nurse has reached the maximum number of patients';
+    end if;
+end;
+// delimiter ;
+
+show triggers;
+
+-- a procedure to calculate the bill amount fo the patient
+--      how much? Patient bill amount = billAmount(in drugOrder) / 100 * days(in patient)
+delimiter //
+create procedure calculatePatientBill(in patName varchar(20))
+begin
+    select p.patName, p.days, o.billAmount, (o.billAmount / 100) * p.days as patientBill from patient p
+             join drugOrder o on p.admitLocation = o.hospName
+    where p.patName = patName;
+end // delimiter ;
+
+select * from patient p1, patient p2 where p1.id = p2.patAge;
+select p.* from patient p,treatment t,doctor d where p.patID = t.patientID and t.doctorID = d.docID;
+select docInfo.docID from (select d.* from doctor d,admission a where d.docID = a.attendDocID) docInfo where docInfo.docAge > 49;
+
+select docName from doctor where docID > 91005
+union all
+select dest from admission where attendDocID > 91005;
+
+insert into patient(patID,patName, patGender, patAge, patPhoneNum, disease, treatment, days, primaryDocID, patLocation, admitLocation)
+values (1030,'dancy', 'female', 30, '1234567890', 'heart disease', 'heart treatment', 60, 1, 'New York', 'Loyal Hospital');
+select * from patient where patName = 'dancy';
+select d.* from doctor as d
+         join patient as p on d.docID = p.primaryDocID
+where p.patName = 'dancy';
+insert into admission(id, attendDocID, nurID, patID, dest)
+select null, d.docID, n.nurID, p.patID, 'My Hospital' from patient as p
+         join doctor as d on d.hospName = 'My Hospital'
+         join nurse as n on n.hospName = 'My Hospital'
+where p.patName = 'dancy'
+group by d.docID
+order by d.docID asc
+limit 1;
+
+
+
+update patient
+set disease = 'epilepsia', treatment = 'epilepsia treatment', days = 30, admitLocation = 'My Hospital'
+where patName = 'dancy';
+
+
+
+select count(*) from doctor where hospName = 'Loyal Hospital';
+select avg(patAge) from patient where patGender = 'male';
+select max(days) from patient where patGender = 'female';
+select sum(billAmount) from drugOrder where hospName like 'Center%';
+
+select a.id, a.patientID, a.doctorID, a.disease, p.patName, patPhoneNum from treatment as a
+                                    join patient as p on a.patientID = p.patID
+group by a.id;
+
+select * from nurse order by nurAge;
+
+select a.id, a.patName, a.days, b.nurName from patient AS a, nurTakeCarePat as n, nurse as b
+where a.patID = n.patID and n.nurID = b.nurID order by days limit 20;
+
+-- One day, a patient named Mason came to treat the disease, what will happen?
+-- query info of Mason
+select * from patient where patName = 'Mason';
+-- query treatment of Mason
+select t.*, d.docName, p.treatment from treatment t
+         left outer join doctor d on t.doctorID = d.docID
+         left join patient p on t.patientID = p.patID
+where p.patName = 'Mason' and t.disease = 'fever';
+-- query admission of Mason
+select a.id, a.attendDocID, d.docName, a.nurID, n.nurName, a.patID, p.patName, a.dest from admission a
+         right join doctor d on a.attendDocID = d.docID
+         right outer join nurse n on a.nurID = n.nurID
+         right join patient p on a.patID = p.patID
+where p.patName = 'Mason';
+-- cal the bill amount
+call calculatePatientBill('Mason');
+
+
+
+select @@autocommit;
+set @@autocommit = 0;
+
+-- One day, a new patient named xiaorui came to treat the disease, what will happen?
+start transaction;
+-- add xiaorui to patient table
+insert into patient (patID, patName, patAge, patGender, patPhoneNum, disease, treatment, days, primaryDocID, patLocation, admitLocation)
+values (1028, 'xiaorui', 33, 'male', '123456789', 'allergy', 'allergy treatment', 10, 91008, 'Xiaorui Road', 'My Hospital');
+
+-- add the patient xiaorui to the treatment table, and associate the patient with the primary doctor
+insert into treatment (patientID, doctorID, disease) values (1028, 91008, 'allergy');
+
+-- patient xiaorui's treatment of allergy is over, update the disease, treatment, course of xiaorui
+update patient set disease = 'heart disease', treatment = 'heart treatment', days = 60 where patID = 1028;
+
+-- add the relocate record of patient xiaorui to the admission table
+insert into admission (attendDocID, nurID, patID, dest) values (91001, 21001, 1028, 'Loyal Hospital');
+
+-- submit the transaction
+commit;
+-- return
+rollback;
+
+
+-- create views for safety
+create view docHosp_Info as
+    select doc.docID, doc.docName, doc.docAge, hos.name as hospName from doctor doc
+         join hospital hos on doc.hospName = hos.name;
+
+create view nurHosp_Info as
+    select nur.nurID, nur.nurName, nur.nurAge, hos.name as hospName from nurse as nur
+         join hospital as hos on nur.hospName = hos.name;
+
+-- create indexes for improving speed of querying(use B+ tree)
+create index index_pat_name_phone on patient(patName, patPhoneNum);
+create index index_doc_name_hosp on doctor(docName, hospName);
+create index index_nur_name_hosp on nurse(nurName, hospName);
+create index index_drugOrder_hosp_phar_drug on drugOrder(hospName, pharName, drugName);
+
+-- test for php sql
+select t.patientID, t.doctorID, d.docName, d.hospName from treatment t,doctor d where t.doctorID = d.docID;
+
+-- limitations
+/*
+Data integrity and data validation: Although constraints and foreign keys are used in many places, data integrity still needs to be considered further.
+Data Redundancy: There may be data redundancy in some tables. For example, in the doctor and nurse tables, the hospName column may cause data duplication.
+Patient's treatment information: The patient table contains the patient's treatment information. However, a single patient may have multiple treatment stages, and each stage may have a different disease and treatment modality.
+Data Leakage: Our designs contain sensitive information such as patient names, ages, phone numbers, etc. Such information may be improperly accessed or disclosed. We have not yet learned about network security and how to prevent malicious attacks such as SQL injection attacks.
+*/
+
+
+
+

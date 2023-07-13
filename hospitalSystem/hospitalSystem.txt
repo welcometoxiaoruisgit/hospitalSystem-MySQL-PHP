@@ -1,0 +1,162 @@
+create table hospital(
+                          id int primary key comment 'id of the hospital',
+                          name varchar(20) not null unique comment 'The name of the hospital',
+                          nurseNum int not null check(nurseNum>=0 and nurseNum<=5) comment 'how many nurses in this hospital',
+                          doctorNum int not null check(doctorNum>=0 and doctorNum<=3) comment 'how many doctors',
+                          patientNum int not null check(patientNum>=0 and patientNum<=10) comment 'how many patients',
+                          key hosp_union_Info (id,name,nurseNum,doctorNum,patientNum)
+) comment 'Hospital information';
+insert into hospital values (1,'Loyal Hospital',5,3,10),(2,'Center Hospital',5,3,10),
+                             (3,'My Hospital',5,3,10);
+select * from hospital;
+desc hospital;
+
+create table hospLocations (
+                          id int primary key,
+                          location varchar(20) not null unique,
+                          constraint hosp_location foreign key (id) references hospital(id) on update cascade on delete cascade
+);
+
+create table pharmacy(
+                           id int primary key comment 'primary key and the id of the pharmacy',
+                           name varchar(20) not null unique comment 'The name of the pharmacy',
+                           key pharmacy_id_name (id,name)
+) comment 'Pharmacy Information';
+insert into pharmacy values (1,'Rain Pharmacy'),(2,'Sun Pharmacy'),(3,'Fog Pharmacy');
+select * from pharmacy;
+
+create table pharLocations (
+                           id int primary key,
+                           location varchar(20) not null unique,
+                           constraint phar_location foreign key (id) references pharmacy(id) on update cascade on delete cascade
+);
+
+create table drugOrder(
+                          id int primary key auto_increment comment 'primary key',
+                          hospName varchar(20) not null comment 'which hospital pays the bill?',
+                          pharName varchar(20) not null comment 'which pharmacy sends the drug?',
+                          drugName varchar(20) not null comment 'the name of the drug',
+                          billAmount double not null check ( billAmount >= 0 ) comment 'how much is the drug?',
+                          key drugOrder_union_Info(id,hospName,pharName,drugName,billAmount),
+                          constraint drugOrder_fk_hospName foreign key (hospName) references hospital(name)
+                              on update cascade on delete cascade,
+                          constraint drugOrder_fk_pharName foreign key (pharName) references pharmacy(name)
+                              on update cascade on delete cascade
+) comment 'The information of the drug order';
+desc insert into drugOrder values (1,'Loyal Road','Rain Road','Rain Drug',123.45);
+
+create table patient(
+                        id int primary key auto_increment comment 'primary key',
+                        patID int not null unique comment 'The id of the patient',
+                        patName varchar(15) not null comment 'The name of the patient',
+                        patGender varchar(10) comment 'The gender of the patient',
+                        patAge int not null comment 'The age of the patient',
+                        patPhoneNum varchar(15) unique comment 'The phone number of the patient',
+                        disease varchar(20) not null comment 'The disease of the patient',
+                        treatment varchar(20) not null comment 'The treatment which is going on',
+                        days int not null check(days>=0) comment 'the number of days the patient are admitted',
+                        primaryDocID int not null comment 'The id of the primary doctor of the patient',
+                        patLocation varchar(20) not null comment 'The patient live in which location',
+                        admitLocation varchar(20) not null comment 'The location where the patient is admitted',
+                        key union_patientInfo (id,patID,patName,patGender,patAge,patPhoneNum,disease,treatment,days,
+                                               primaryDocID,patLocation,admitLocation)
+) comment 'The information of the patient';
+set global local_infile = 1;
+-- load data local infile '/patient.txt' into table patient character set utf8 fields terminated by ',' lines terminated by '\n';
+desc insert into patient value (1,1001,'Tom Cluse','male',20,'1234567890','heart disease','heart treatment',30,1001,'Tom Road','Loyal Road');
+
+create table doctor(
+                       id int primary key auto_increment comment 'primary key',
+                       docID int not null unique comment 'the id of the doctor',
+                       docName varchar(20) not null comment 'the name of the doctor',
+                       docAge int not null check(docAge>0) comment 'the age of the doctor',
+                       hospName varchar(20) not null comment 'the doctor is in which hospital',
+                       key doc_ID_Age_Loca_respPatID (id,docID,docName,docAge,hospName),
+                       constraint docLoca_fk_hosp foreign key (hospName) references hospital(name)
+                           on update cascade on delete cascade
+) comment 'the information of the doctor';
+desc insert into doctor value (1,1001,'Krisu May',50,'Loyal Road');
+
+create table treatment(
+                          id int primary key auto_increment,
+                          patientID int not null,
+                          doctorID int not null,
+                          disease varchar(20) not null,
+                          key connPD_patID_docID (id,patientID,doctorID,disease),
+                          constraint patientID_fk foreign key (patientID) references patient(patID)
+                              on update cascade on delete cascade,
+                          constraint doctorID_fk foreign key (doctorID) references doctor(docID)
+                              on update cascade on delete cascade
+) comment 'Connection of the table patient and doctor';
+desc insert into treatment value (1,1001,1001,'heart disease');
+
+create table nurse(
+                      id int primary key auto_increment,
+                      nurID int not null unique comment 'the id of the nurse',
+                      nurName varchar(20) not null comment 'the name of the nurse',
+                      nurAge int not null check(nurAge>0) comment 'the age of the nurse',
+                      hospName varchar(20) not null comment 'the nurse is in which location',
+                      key nur_ID_Age_dept_Loca (id,nurID,nurName,nurAge,hospName),
+                      constraint nurLoca_fk_hosp foreign key (hospName) references hospital(name)
+                          on update cascade on delete cascade
+) comment 'the information of the nurse';
+desc insert into nurse value (1,1001,'Josephe Jostar',18,'Loyal Road');
+
+create table nurTakeCarePat(
+                               id int primary key auto_increment,
+                               nurID int not null,
+                               patID int not null unique,
+                               key takeCare_nurID_patID (id,nurID,patID),
+                               constraint nurTakeCarePat_nurID foreign key (nurID) references nurse (nurID)
+                                   on update cascade on delete cascade,
+                               constraint nurTakeCarePat_patID foreign key (patID) references patient (patID)
+                                   on update cascade on delete cascade
+) comment 'the info of nurse taking care of patients';
+desc insert into nurTakeCarePat value (1,1001,1001);
+
+create table admission(
+                          id int primary key auto_increment,
+                          attendDocID int not null,
+                          nurID int not null,
+                          patID int not null,
+                          dest varchar(20) not null,
+                          key relocate_union (id,attendDocID,nurID,patID,dest),
+    -- if a patient has many diseases, the primary docID has already stored in the patient table,
+    --  the attending doc treats other diseases of this patient.
+                          constraint admission_docID foreign key (attendDocID) references doctor(docID)
+                              on update cascade on delete cascade,
+                          constraint admission_nurID foreign key (nurID) references nurse(nurID)
+                              on update cascade on delete cascade,
+                          constraint admission_patID foreign key (patID) references patient(patID)
+                              on update cascade on delete cascade,
+                          constraint admission_dest foreign key (dest) references hospital(name)
+                              on update cascade on delete cascade
+) comment 'the admission of the patient';
+desc insert into admission value (1, 1001, 1001, 1001, 'Loyal Road');
+
+-- Hospital and Doctor relationship table
+create table hospDoc (
+                                 hospID int not null,
+                                 docID int not null,
+                                 primary key (hospID, docID),
+                                 constraint hospDoc_hospID_fk foreign key (hospID) references hospital(id) on update cascade on delete cascade,
+                                 constraint hospDoc_docID_fk foreign key (docID) references doctor(id) on update cascade on delete cascade
+);
+
+-- Hospital and Nurse relationship table
+create table hospNur (
+                                hospID int not null,
+                                nurID int not null,
+                                primary key (hospID, nurID),
+                                constraint hospNur_hospID_fk foreign key (hospID) references hospital(id) on update cascade on delete cascade,
+                                constraint hospNur_nurID_fk foreign key (nurID) references nurse(id) on update cascade on delete cascade
+);
+
+-- Hospital and Pharmacy relationship table
+create table hospPhar (
+                                   hospID int not null,
+                                   pharID int not null,
+                                   primary key (hospID, pharID),
+                                   constraint hospPhar_hospID_fk foreign key (hospID) references hospital(id) on update cascade on delete cascade,
+                                   constraint hospPhar_pharID_fk foreign key (pharID) references pharmacy(id) on update cascade on delete cascade
+);
